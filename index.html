@@ -260,10 +260,10 @@ let API_URL = localStorage.getItem("maken_api") || "";
 const ADMIN_PIN = "9473";
 /* ===================================================================== */
 
-const STAGES = ["Prospecto","RFQ / Cotizando","Cotización enviada","Seguimiento","Ganado","Perdido"];
+const STAGES = ["Prospecto","Seguimiento","RFQ / Cotizando","Cotización enviada","Ganado","Perdido"];
 const STAGE_KEY = {"Prospecto":"prospecto","RFQ / Cotizando":"rfq","Cotización enviada":"enviada","Seguimiento":"seguimiento","Ganado":"ganado","Perdido":"perdido"};
-const STAGE_COLOR = {"Prospecto":"#6b7280","RFQ / Cotizando":"#1f6feb","Cotización enviada":"#e8590c","Seguimiento":"#6f42c1","Ganado":"#1a7f37","Perdido":"#cf222e"};
-const OPEN_STAGES = ["Prospecto","RFQ / Cotizando","Cotización enviada","Seguimiento"];
+const STAGE_COLOR = {"Prospecto":"#6b7280","Seguimiento":"#6f42c1","RFQ / Cotizando":"#1f6feb","Cotización enviada":"#e8590c","Ganado":"#1a7f37","Perdido":"#cf222e"};
+const OPEN_STAGES = ["Prospecto","Seguimiento","RFQ / Cotizando","Cotización enviada"];
 const TIPOS = ["Prospecto nuevo","Reactivar","Cliente actual"];
 const TIPO_KEY = {"Prospecto nuevo":"nuevo","Reactivar":"reactivar","Cliente actual":"cliente"};
 const SECTORES = ["Maquinaria pesada","Vehículo comercial","Construcción","Industrial","Alimentos","Energía / HVAC","Otro"];
@@ -636,7 +636,7 @@ function openDetail(id){
   const o=ROWS.find(r=>r.ID===id); if(!o) return;
   const sk=STAGE_KEY[o.Etapa]||"prospecto";
   const notes=(o.Notas||"").split("\n").filter(Boolean).reverse();
-  const showHint = (o.Etapa==="Cotización enviada"||o.Etapa==="Seguimiento") && !o.FechaProximaAccion;
+  const showHint = o.Etapa==="Cotización enviada" && !o.FechaProximaAccion;
   const sameClient = ROWS.filter(r=>r.Empresa===o.Empresa).length;
   const m=$("#modal");
   m.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
