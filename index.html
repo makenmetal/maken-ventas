@@ -154,9 +154,10 @@ nav button.active .navbadge{background:var(--amber)}
 .blocktitle{font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);margin:0 0 9px}
 .stages{display:flex;flex-wrap:wrap;gap:7px}
 .stbtn{font-size:12.5px;font-weight:700;padding:8px 11px;border-radius:10px;border:1.5px solid var(--line);background:#fff;color:var(--ink2)}
-.stbtn.on{border-width:0}
-.cad{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+.stbtn.on{border-width:0;color:#fff;font-weight:800;box-shadow:0 2px 8px rgba(20,23,28,.18)}
+.cad{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;align-items:center}
 .cadbtn{font-size:12px;font-weight:700;padding:8px 11px;border-radius:10px;background:var(--amber-soft);color:var(--amber)}
+.cadbtn.on{background:var(--amber);color:#fff}
 .note{font-size:13px;padding:9px 11px;background:var(--gray-soft);border-radius:9px;margin-bottom:7px;white-space:pre-wrap;border-left:3px solid var(--line)}
 .note .nh{font-size:11px;color:var(--ink3);font-weight:700;display:block;margin-bottom:2px}
 .hint{background:var(--blue-soft);border-radius:11px;padding:11px 13px;font-size:12.5px;color:#0a3d8f;display:flex;gap:9px;margin-bottom:11px;line-height:1.4}
@@ -168,6 +169,7 @@ nav button.active .navbadge{background:var(--amber)}
 .empty b{display:block;color:var(--ink2);font-size:15px;margin-bottom:3px;font-family:'Archivo'}
 .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;margin:46px auto}
 @keyframes spin{to{transform:rotate(360deg)}}
+.spin360{animation:spin .7s linear infinite}
 
 /* toast */
 #toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);z-index:90;background:var(--steel);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;font-size:14px;opacity:0;transition:.25s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:90vw;text-align:center}
@@ -214,7 +216,10 @@ nav button.active .navbadge{background:var(--amber)}
     <div class="mark">M</div>
     <div><b>MAKEN</b><span>Ventas</span></div>
   </div>
-  <button class="who" id="whoBtn"><span class="dot"></span><span id="whoName"></span></button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="who" id="refreshBtn" title="Actualizar"><svg id="refreshIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;display:block"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg><span>Actualizar</span></button>
+    <button class="who" id="whoBtn"><span class="dot"></span><span id="whoName"></span></button>
+  </div>
 </header>
 
 <main class="hidden" id="app">
@@ -526,7 +531,7 @@ function openForm(edit){
   m.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet"><div class="sheet-head">
     <h2>${isEdit?"Editar":"Nueva oportunidad"}</h2><button class="xbtn" onclick="closeModal()">✕</button></div>
     <div class="sheet-body">
-      <div class="field"><label>Empresa *</label><input id="f_emp" value="${esc(o.Empresa||"")}" placeholder="Ej. Nemak"></div>
+      <div class="field"><label>Empresa *</label><input id="f_emp" list="dl_emp" autocomplete="off" value="${esc(o.Empresa||"")}" placeholder="Escribe o elige un cliente…" oninput="onEmpInput()"><datalist id="dl_emp"></datalist></div>
       <div class="field"><label>¿Qué pieza / proyecto?</label><input id="f_desc" value="${esc(o.Descripcion||"")}" placeholder="Ej. Tolvas pailería, soporte CNC…"></div>
       <div class="field2">
         <div class="field"><label>Tipo</label><select id="f_tipo">${TIPOS.map(t=>`<option ${o.Tipo===t?"selected":""}>${t}</option>`).join("")}</select></div>
@@ -537,7 +542,7 @@ function openForm(edit){
         <div class="field"><label>Monto estimado (MXN)</label><input id="f_monto" type="number" inputmode="numeric" value="${o.Monto||""}" placeholder="0"></div>
       </div>
       <div class="field2">
-        <div class="field"><label>Contacto</label><input id="f_cont" value="${esc(o.Contacto||"")}" placeholder="Nombre"></div>
+        <div class="field"><label>Contacto</label><input id="f_cont" list="dl_cont" autocomplete="off" value="${esc(o.Contacto||"")}" placeholder="Nombre" oninput="onContInput()"><datalist id="dl_cont"></datalist></div>
         <div class="field"><label>Puesto</label><input id="f_puesto" value="${esc(o.Puesto||"")}" placeholder="Compras…"></div>
       </div>
       <div class="field2">
@@ -553,6 +558,44 @@ function openForm(edit){
       <button class="btn btn-primary" onclick="saveForm('${isEdit?o.ID:""}')">${isEdit?"Guardar cambios":"Crear oportunidad"}</button>
       ${isEdit?`<button class="btn btn-red" style="margin-top:10px" onclick="delOpp('${o.ID}')">Eliminar</button>`:""}
     </div></div></div>`;
+  populateDatalists(o.Empresa||"");
+}
+
+/* ---------- autocompletado de clientes y contactos ---------- */
+function companyIndex(){
+  const idx={};
+  ROWS.forEach(o=>{
+    const key=(o.Empresa||"").trim(); if(!key) return;
+    if(!idx[key]) idx[key]={Sector:"",Tipo:"",contacts:{}};
+    if(o.Sector) idx[key].Sector=o.Sector;
+    if(o.Tipo) idx[key].Tipo=o.Tipo;
+    const cn=(o.Contacto||"").trim();
+    if(cn) idx[key].contacts[cn]={Puesto:o.Puesto||"",Telefono:o.Telefono||"",Email:o.Email||""};
+  });
+  return idx;
+}
+function populateDatalists(company){
+  const idx=companyIndex();
+  const dlE=document.getElementById("dl_emp");
+  if(dlE) dlE.innerHTML=Object.keys(idx).sort((a,b)=>a.localeCompare(b)).map(e=>`<option value="${esc(e)}">`).join("");
+  refreshContactList(company);
+}
+function refreshContactList(company){
+  const dlC=document.getElementById("dl_cont"); if(!dlC) return;
+  const c=companyIndex()[(company||"").trim()];
+  const names=c?Object.keys(c.contacts):[];
+  dlC.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join("");
+}
+function onEmpInput(){
+  const v=$("#f_emp").value.trim();
+  refreshContactList(v);
+  const c=companyIndex()[v];
+  if(c){ if(c.Sector)$("#f_sector").value=c.Sector; if(c.Tipo)$("#f_tipo").value=c.Tipo; }
+}
+function onContInput(){
+  const comp=$("#f_emp").value.trim(), name=$("#f_cont").value.trim();
+  const c=companyIndex()[comp];
+  if(c && c.contacts[name]){ const k=c.contacts[name]; $("#f_puesto").value=k.Puesto||""; $("#f_tel").value=k.Telefono||""; $("#f_email").value=k.Email||""; }
 }
 async function saveForm(id){
   const emp=$("#f_emp").value.trim();
@@ -583,12 +626,14 @@ function openDetail(id){
   const sk=STAGE_KEY[o.Etapa]||"prospecto";
   const notes=(o.Notas||"").split("\n").filter(Boolean).reverse();
   const showHint = (o.Etapa==="Cotización enviada"||o.Etapa==="Seguimiento") && !o.FechaProximaAccion;
+  const sameClient = ROWS.filter(r=>r.Empresa===o.Empresa).length;
   const m=$("#modal");
   m.innerHTML=`<div class="overlay" onclick="if(event.target===this)closeModal()"><div class="sheet">
     <div class="sheet-head"><h2></h2><button class="xbtn" onclick="closeModal()">✕</button></div>
     <div class="sheet-body" style="padding-top:0">
       <div class="d-emp">${esc(o.Empresa)}</div>
       <div class="d-sub">${esc(o.Descripcion||"Sin descripción")}</div>
+      ${sameClient>1?`<div class="muted" style="font-size:12.5px;margin-top:5px">📁 ${sameClient} oportunidades de este cliente · <a onclick="filterClient('${esc(o.Empresa).replace(/'/g,"\\'")}')" style="color:var(--blue);cursor:pointer">ver todas</a></div>`:""}
       <div class="meta" style="margin:11px 0 14px">
         <span class="tag s-${sk}">${esc(o.Etapa)}</span>
         <span class="tag t-${TIPO_KEY[o.Tipo]||'nuevo'}">${esc(o.Tipo)}</span>
@@ -600,19 +645,27 @@ function openDetail(id){
 
       <div class="d-block">
         <div class="blocktitle">Mover etapa</div>
-        <div class="stages">${STAGES.map(s=>`<button class="stbtn ${o.Etapa===s?'on s-'+STAGE_KEY[s]:''}" onclick="moveStage('${id}','${s}')">${s}</button>`).join("")}</div>
+        <div class="stages">${STAGES.map(s=>{const k=STAGE_KEY[s];const on=o.Etapa===s;return `<button class="stbtn ${on?'on b-'+k:''}" onclick="moveStage('${id}','${s}')">${on?'✓ ':''}${s}</button>`}).join("")}</div>
       </div>
 
       <div class="d-block">
-        <div class="blocktitle">Próxima acción</div>
-        ${o.ProximaAccion?`<div style="font-weight:600;margin-bottom:4px">${esc(o.ProximaAccion)}</div><div class="muted" style="font-size:13px;margin-bottom:10px">${o.FechaProximaAccion?"Para el "+fmtDate(o.FechaProximaAccion):"sin fecha"}</div>`:`<div class="muted" style="margin-bottom:10px">No definida.</div>`}
-        <input id="d_next" placeholder="Ej. Confirmar recepción y precio" value="${esc(o.ProximaAccion||"")}" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px">
+        <div class="blocktitle">Registrar seguimiento</div>
+        ${o.ProximaAccion?`<div class="next ${dueState(o.FechaProximaAccion)}" style="margin-bottom:13px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>
+            <span><b>Pendiente:</b> ${esc(o.ProximaAccion)}${o.FechaProximaAccion?" · "+fmtDate(o.FechaProximaAccion):""} — <a onclick="clearAction('${id}')" style="color:var(--red);cursor:pointer;font-weight:700">marcar hecha</a></span></div>`:""}
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:5px">Nota de bitácora <span class="muted" style="font-weight:500">— opcional</span></label>
+        <textarea id="d_nota" placeholder="¿Qué pasó? Llamada, correo, visita…" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;min-height:54px;margin-bottom:12px;outline:none"></textarea>
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:5px">Próxima acción <span class="muted" style="font-weight:500">— opcional</span></label>
+        <input id="d_next" placeholder="Ej. Enviar cotización, llamar de nuevo…" value="" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;outline:none">
         <div class="cad">
-          <button class="cadbtn" onclick="setNextDate('${id}',0)">Hoy</button>
-          <button class="cadbtn" onclick="setNextDate('${id}',2)">+2 días</button>
-          <button class="cadbtn" onclick="setNextDate('${id}',7)">+1 sem</button>
-          <button class="cadbtn" onclick="setNextDate('${id}',14)">+2 sem</button>
+          <button class="cadbtn" id="cad0" onclick="setCad(0)">Hoy</button>
+          <button class="cadbtn" id="cad2" onclick="setCad(2)">+2 días</button>
+          <button class="cadbtn" id="cad7" onclick="setCad(7)">+1 sem</button>
+          <button class="cadbtn" id="cad14" onclick="setCad(14)">+2 sem</button>
+          <input type="date" id="d_nextd" value="" onchange="markCad()" style="padding:7px 9px;border:1px solid var(--line);border-radius:10px;font-size:12px;outline:none">
         </div>
+        <button class="btn btn-dark" style="margin-top:12px" onclick="saveFollowup('${id}')">Guardar seguimiento</button>
+        <p class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.45">Guarda solo la nota, solo la acción, o ambas. La nota va a la bitácora; la acción aparece en <b>Hoy</b>.</p>
       </div>
 
       <div class="d-block">
@@ -627,9 +680,7 @@ function openDetail(id){
 
       <div class="d-block">
         <div class="blocktitle">Bitácora</div>
-        <textarea id="d_nota" placeholder="Registrar contacto / nota…" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:11px;min-height:54px;margin-bottom:8px"></textarea>
-        <button class="btn btn-dark btn-sm" onclick="addNote('${id}')">+ Agregar nota</button>
-        <div style="margin-top:12px">${notes.length?notes.map(n=>`<div class="note">${esc(n)}</div>`).join(""):`<div class="muted" style="font-size:13px">Sin notas todavía.</div>`}</div>
+        <div>${notes.length?notes.map(n=>`<div class="note">${esc(n)}</div>`).join(""):`<div class="muted" style="font-size:13px">Sin notas todavía.</div>`}</div>
       </div>
 
       <div class="row" style="margin-top:6px">
@@ -640,40 +691,61 @@ function openDetail(id){
     </div></div></div>`;
 }
 
-async function patch(id,rec,msg){
-  try{ await apiPost({action:"update",id,rec}); await load(false); if(msg)toast(msg); return true; }
-  catch(e){ toast(e.message,true); return false; }
+function applyLocal(id,rec){ const o=ROWS.find(r=>r.ID===id); if(o) Object.assign(o,rec); return o; }
+async function pushUpdate(id,rec,msg){
+  try{ await apiPost({action:"update",id,rec}); if(msg) toast(msg); }
+  catch(e){ toast("No se guardó: "+e.message,true); await load(false); if(document.querySelector(".overlay")) openDetail(id); }
 }
-async function moveStage(id,stage){
-  const rec={Etapa:stage};
-  if((stage==="Ganado"||stage==="Perdido")){ /* handled by closeAs for reason */ }
-  await patch(id,rec,"Etapa: "+stage);
-  const o=ROWS.find(r=>r.ID===id); if(o) openDetail(id);
+function moveStage(id,stage){
+  applyLocal(id,{Etapa:stage});
+  openDetail(id); render();                 // instantáneo
+  pushUpdate(id,{Etapa:stage},"Etapa: "+stage);   // guarda en segundo plano
 }
-async function setNextDate(id,days){
-  const txt=$("#d_next").value.trim();
-  const rec={ProximaAccion:txt, FechaProximaAccion:addDays(days)};
-  if(await patch(id,rec,"Próxima acción: "+fmtDate(addDays(days)))) openDetail(id);
+function setCad(days){ const i=$("#d_nextd"); if(i){ i.value=addDays(days); markCad(); } }
+function markCad(){
+  const d=$("#d_nextd")?$("#d_nextd").value:"";
+  [["cad0",0],["cad2",2],["cad7",7],["cad14",14]].forEach(function(p){
+    const b=document.getElementById(p[0]); if(b) b.classList.toggle("on", !!d && d===addDays(p[1]));
+  });
 }
-async function addNote(id){
-  const t=$("#d_nota").value.trim(); if(!t){toast("Escribe la nota",true);return;}
-  const o=ROWS.find(r=>r.ID===id);
-  const newNota=(o.Notas?o.Notas+"\n":"")+`[${todayStr()} · ${ME}] ${t}`;
-  if(await patch(id,{Notas:newNota,FechaUltimoContacto:todayStr()},"Nota agregada")) openDetail(id);
+function saveFollowup(id){
+  const note=$("#d_nota").value.trim();
+  const act=$("#d_next").value.trim();
+  let date=$("#d_nextd").value;
+  if(!note && !act && !date){ toast("Escribe una nota o define una acción",true); return; }
+  const o=ROWS.find(r=>r.ID===id); const rec={};
+  if(note){ rec.Notas=(o.Notas?o.Notas+"\n":"")+`[${todayStr()} · ${ME}] ${note}`; rec.FechaUltimoContacto=todayStr(); }
+  if(act && !date) date=todayStr();        // acción sin fecha => hoy
+  if(act || date){ rec.ProximaAccion=act; rec.FechaProximaAccion=date; }
+  applyLocal(id,rec);
+  openDetail(id); render();                 // instantáneo
+  pushUpdate(id,rec,"Seguimiento guardado ✓");
+}
+function clearAction(id){
+  if(!confirm("¿Marcar la próxima acción como hecha y quitarla? La oportunidad dejará de aparecer en pendientes hasta que definas otra.")) return;
+  const rec={ProximaAccion:"",FechaProximaAccion:""};
+  applyLocal(id,rec); openDetail(id); render();
+  pushUpdate(id,rec,"Acción completada");
 }
 function closeAs(id,stage){
+  let rec;
   if(stage==="Perdido"){
     const r=prompt("Motivo de pérdida (precio, tiempo de entrega, competencia…):","");
     if(r===null) return;
-    patch(id,{Etapa:"Perdido",MotivoPerdido:r,ProximaAccion:"",FechaProximaAccion:""},"Marcado perdido").then(()=>closeModal());
+    rec={Etapa:"Perdido",MotivoPerdido:r,ProximaAccion:"",FechaProximaAccion:""};
+    applyLocal(id,rec); closeModal(); render();
+    pushUpdate(id,rec,"Marcado perdido");
   } else {
-    patch(id,{Etapa:"Ganado",ProximaAccion:"",FechaProximaAccion:""},"¡Ganado! 🎉").then(()=>closeModal());
+    rec={Etapa:"Ganado",ProximaAccion:"",FechaProximaAccion:""};
+    applyLocal(id,rec); closeModal(); render();
+    pushUpdate(id,rec,"¡Ganado! 🎉");
   }
 }
 async function delOpp(id){
   if(!confirm("¿Eliminar esta oportunidad? No se puede deshacer.")) return;
-  try{ await apiPost({action:"delete",id}); toast("Eliminada"); closeModal(); await load(false); }
-  catch(e){ toast(e.message,true); }
+  ROWS=ROWS.filter(r=>r.ID!==id); closeModal(); render();   // instantáneo
+  try{ await apiPost({action:"delete",id}); toast("Eliminada"); }
+  catch(e){ toast("No se eliminó: "+e.message,true); await load(false); }
 }
 function closeModal(){ $("#modal").innerHTML=""; if(VIEW==="nuevo"){VIEW="pipeline";syncNav();render();} }
 
@@ -719,9 +791,29 @@ async function seedAccounts(){
 function go(v){ VIEW=v; syncNav(); render(); window.scrollTo(0,0); }
 function syncNav(){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.v===VIEW)); }
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>go(b.dataset.v));
+function filterClient(name){ closeModal(); FILTER.stage="";FILTER.tipo="";FILTER.mine=false;FILTER.q=name; go("pipeline"); }
+
+/* ---------- actualización (sincroniza entre dispositivos) ---------- */
+async function quietRefresh(){
+  if(!ME||!API_URL) return;
+  if(document.querySelector(".overlay")) return;            // hay un formulario/detalle abierto
+  const a=document.activeElement;
+  if(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName)) return;   // está escribiendo
+  try{ ROWS=await apiList(); render(); }catch(e){}
+}
+async function manualRefresh(){
+  const ic=document.getElementById("refreshIcon");
+  if(ic) ic.classList.add("spin360");
+  try{ ROWS=await apiList(); render(); toast("Actualizado ✓"); }
+  catch(e){ toast("No se pudo actualizar",true); }
+  finally{ if(ic) ic.classList.remove("spin360"); }
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") quietRefresh(); });
+setInterval(quietRefresh, 45000);
 
 /* ---------- init ---------- */
 function boot(){
+  const rb=document.getElementById("refreshBtn"); if(rb) rb.onclick=manualRefresh;
   if(location.hash.indexOf("#api=")===0){
     const u=decodeURIComponent(location.hash.slice(5));
     if(u){ localStorage.setItem("maken_api",u); API_URL=u; history.replaceState(null,"",location.pathname+location.search); }
