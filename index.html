@@ -253,10 +253,11 @@ nav button.active .navbadge{background:var(--amber)}
 
 <script>
 /* =====================================================================
-   CONFIGURACIÓN  —  EDITA ESTAS 2 LÍNEAS
+   CONEXIÓN AL BACKEND — fija en el código.
+   Si algún día cambia la URL del Apps Script, edita SOLO esta línea
+   y vuelve a subir el index.html. El equipo no toca nada.
    ===================================================================== */
-// No necesitas editar nada aquí. La conexión y los nombres se configuran dentro de la app.
-let API_URL = localStorage.getItem("maken_api") || "";
+const API_URL = "https://script.google.com/macros/s/AKfycbwR7Bk6KxSr-TS2qWyzLlrBpm6dcYIMGRvDfMNgj1LFPx39JHajceKIE_6bNXqnXjucFw/exec";
 const ADMIN_PIN = "9473";
 /* ===================================================================== */
 
@@ -324,31 +325,6 @@ async function load(showSpin){
 function seenNames(){ try{return JSON.parse(localStorage.getItem("maken_names")||"[]");}catch(e){return [];} }
 function vendorList(){ const s=new Set(ROWS.map(o=>o.Vendedor).filter(Boolean)); seenNames().forEach(n=>s.add(n)); if(ME)s.add(ME); return [...s]; }
 
-function showSetup(){
-  $("#login h1").textContent="Conectar";
-  $("#login p").textContent="Pega la URL del Apps Script (termina en /exec)";
-  $("#vsel").innerHTML=`
-    <input id="setupUrl" placeholder="https://script.google.com/macros/s/.../exec" value="${esc(API_URL)}"
-      style="width:100%;padding:14px;border-radius:13px;border:1px solid #3a4150;background:#2e333d;color:#fff;font-size:13px;margin-bottom:11px;outline:none">
-    <button class="vbtn" style="background:var(--amber);justify-content:center" onclick="saveApi(event)">Probar y guardar</button>
-    <p style="color:#9aa1ad;font-size:12px;margin-top:16px;line-height:1.5">¿No la tienes? En tu Google Sheet: Extensiones → Apps Script → Implementar como app web ("Cualquier usuario") y copia la URL que termina en /exec.</p>`;
-}
-async function saveApi(ev){
-  let u=$("#setupUrl").value.trim().replace(/\s+/g,"");
-  if(!u){ toast("Pega la URL",true); return; }
-  const btn=ev.target; btn.textContent="Probando…"; btn.disabled=true;
-  try{
-    const r=await fetch(u+"?action=ping&t="+Date.now());
-    const j=await r.json();
-    if(!j.ok) throw new Error("respuesta inesperada");
-    localStorage.setItem("maken_api",u); API_URL=u;
-    toast("Conectado ✓");
-    $("#login h1").textContent="MAKEN Ventas";
-    $("#login p").textContent="Escribe o elige tu nombre para entrar";
-    renderLogin();
-  }catch(e){ toast("No conecta: "+e.message,true); btn.textContent="Reintentar"; btn.disabled=false; }
-}
-
 function renderLogin(){
   const seen=seenNames();
   $("#vsel").innerHTML =
@@ -356,15 +332,14 @@ function renderLogin(){
     + `<input id="newname" placeholder="Tu nombre" onkeydown="if(event.key==='Enter')addName()"
         style="width:100%;padding:14px;border-radius:13px;border:1px solid #3a4150;background:#2e333d;color:#fff;font-size:16px;margin:6px 0 11px;outline:none">
        <button class="vbtn" style="background:var(--amber);justify-content:center" onclick="addName()">Entrar</button>
-       <button onclick="shareConfig()" style="background:none;color:#9aa1ad;font-size:12px;margin-top:20px;text-decoration:underline;width:100%">Compartir enlace ya configurado con el equipo</button>`;
+       <button onclick="shareConfig()" style="background:none;color:#9aa1ad;font-size:12px;margin-top:20px;text-decoration:underline;width:100%">Compartir la app con el equipo</button>`;
 }
 function addName(){
   const v=$("#newname").value.trim(); if(!v){ toast("Escribe tu nombre",true); return; }
   setMe(v);
 }
 function shareConfig(){
-  if(!API_URL){ toast("Primero conecta la app",true); return; }
-  const link=location.origin+location.pathname+"#api="+encodeURIComponent(API_URL);
+  const link=location.origin+location.pathname;
   if(navigator.share){ navigator.share({title:"MAKEN Ventas",url:link}).catch(()=>{}); }
   else { navigator.clipboard.writeText(link).then(()=>toast("Enlace copiado")).catch(()=>prompt("Copia este enlace:",link)); }
 }
@@ -825,11 +800,7 @@ setInterval(quietRefresh, 45000);
 /* ---------- init ---------- */
 function boot(){
   const rb=document.getElementById("refreshBtn"); if(rb) rb.onclick=manualRefresh;
-  if(location.hash.indexOf("#api=")===0){
-    const u=decodeURIComponent(location.hash.slice(5));
-    if(u){ localStorage.setItem("maken_api",u); API_URL=u; history.replaceState(null,"",location.pathname+location.search); }
-  }
-  if(!API_URL){ showSetup(); return; }
+  localStorage.removeItem("maken_api");   // limpia URLs viejas guardadas en el dispositivo
   if(ME){ setMe(ME); } else { renderLogin(); }
 }
 boot();
