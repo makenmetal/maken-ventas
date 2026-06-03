@@ -187,14 +187,16 @@ nav button.active .navbadge{background:var(--amber)}
 #login .vbtn .av{width:34px;height:34px;border-radius:50%;background:var(--amber);display:grid;place-items:center;font-family:'Archivo';font-weight:800}
 
 @media(min-width:620px){
-  nav{position:sticky;bottom:auto;top:0;border-top:none;border-bottom:1px solid var(--line);box-shadow:none;background:transparent;margin-top:8px;padding:0;justify-content:flex-start;gap:4px}
+  nav{position:static;border-top:none;border-bottom:1px solid var(--line);box-shadow:none;background:transparent;margin:10px auto 0;padding:0 14px 8px;justify-content:flex-start;gap:4px}
   nav button{flex:none;flex-direction:row;gap:7px;font-size:13.5px;padding:9px 15px}
   nav button svg{width:18px;height:18px}
   nav button.active{background:var(--amber);color:#fff;border-radius:11px}
   nav button.active svg,nav button.active{color:#fff}
   .navbadge{position:static;transform:none;background:rgba(255,255,255,.25)!important}
   body{padding-bottom:30px}
+  main{padding-top:4px}
   .kpis{grid-template-columns:repeat(4,1fr)}
+  .chips{flex-wrap:wrap;overflow:visible}
   .overlay{align-items:center}
   .sheet{border-radius:20px;max-height:90vh}
 }
@@ -222,10 +224,6 @@ nav button.active .navbadge{background:var(--amber)}
   </div>
 </header>
 
-<main class="hidden" id="app">
-  <div id="view"></div>
-</main>
-
 <!-- NAV -->
 <nav class="hidden" id="nav">
   <button data-v="hoy" class="active">
@@ -246,6 +244,10 @@ nav button.active .navbadge{background:var(--amber)}
   </button>
 </nav>
 
+<main class="hidden" id="app">
+  <div id="view"></div>
+</main>
+
 <div id="modal"></div>
 <div id="toast"></div>
 
@@ -265,6 +267,11 @@ const OPEN_STAGES = ["Prospecto","RFQ / Cotizando","Cotización enviada","Seguim
 const TIPOS = ["Prospecto nuevo","Reactivar","Cliente actual"];
 const TIPO_KEY = {"Prospecto nuevo":"nuevo","Reactivar":"reactivar","Cliente actual":"cliente"};
 const SECTORES = ["Maquinaria pesada","Vehículo comercial","Construcción","Industrial","Alimentos","Energía / HVAC","Otro"];
+const PERIODICIDADES = ["Único","Mensual","Trimestral","Semestral","Anual"];
+const PERIOD_MULT = {"Único":1,"Mensual":12,"Trimestral":4,"Semestral":2,"Anual":1};
+const PERIOD_SHORT = {"Único":"","Mensual":"/mes","Trimestral":"/trim","Semestral":"/sem","Anual":"/año"};
+function montoLabel(o){ if(!o.Monto) return ""; return money(o.Monto)+(o.Periodicidad&&PERIOD_SHORT[o.Periodicidad]?" "+PERIOD_SHORT[o.Periodicidad]:""); }
+function montoAnual(o){ return (parseFloat(o.Monto)||0)*(PERIOD_MULT[o.Periodicidad]||1); }
 
 let ROWS = [];
 let ME = localStorage.getItem("maken_vendedor") || "";
@@ -397,7 +404,7 @@ function oppCard(o){
     <div class="barL b-${sk}"></div>
     <div class="top">
       <div><div class="emp">${esc(o.Empresa)}</div>${o.Descripcion?`<div class="desc">${esc(o.Descripcion)}</div>`:""}</div>
-      ${o.Monto?`<div class="monto">${money(o.Monto)}</div>`:""}
+      ${o.Monto?`<div class="monto">${montoLabel(o)}</div>`:""}
     </div>
     <div class="meta">
       <span class="tag s-${sk}">${esc(o.Etapa)}</span>
@@ -495,8 +502,8 @@ function renderMetricas(){
   const ganado=ROWS.filter(o=>o.Etapa==="Ganado"), perdido=ROWS.filter(o=>o.Etapa==="Perdido");
   const cerrados=ganado.length+perdido.length;
   const tasa = cerrados? Math.round(ganado.length/cerrados*100):0;
-  const pipeMonto=open.reduce((s,o)=>s+(parseFloat(o.Monto)||0),0);
-  const ganMonto=ganado.reduce((s,o)=>s+(parseFloat(o.Monto)||0),0);
+  const pipeMonto=open.reduce((s,o)=>s+montoAnual(o),0);
+  const ganMonto=ganado.reduce((s,o)=>s+montoAnual(o),0);
   const mes=todayStr().slice(0,7);
   const nuevosMes=ROWS.filter(o=>o.Tipo==="Prospecto nuevo" && String(o.FechaCreado).slice(0,7)===mes).length;
   const vencidas=open.filter(o=>o.FechaProximaAccion && o.FechaProximaAccion<=todayStr()).length;
@@ -510,8 +517,8 @@ function renderMetricas(){
       <div class="kpi blue"><div class="v">${nuevosMes}</div><div class="l">Prospectos nuevos (mes)</div></div>
     </div>
     <div class="kpis" style="margin-top:10px">
-      <div class="kpi dark" style="grid-column:span 2"><div class="v">${money(pipeMonto)}</div><div class="l">Monto en pipeline (abierto)</div></div>
-      <div class="kpi" style="grid-column:span 2"><div class="v" style="color:var(--green)">${money(ganMonto)}</div><div class="l">Monto ganado (histórico)</div></div>
+      <div class="kpi dark" style="grid-column:span 2"><div class="v">${money(pipeMonto)}</div><div class="l">Pipeline anualizado (abierto)</div></div>
+      <div class="kpi" style="grid-column:span 2"><div class="v" style="color:var(--green)">${money(ganMonto)}</div><div class="l">Ganado anualizado (histórico)</div></div>
     </div>
     <div class="sect"><h2>Embudo</h2></div>
     <div class="card funnel" style="padding:14px">
@@ -539,8 +546,12 @@ function openForm(edit){
         <div class="field"><label>Etapa</label><select id="f_etapa">${STAGES.map(s=>`<option ${(o.Etapa||"Prospecto")===s?"selected":""}>${s}</option>`).join("")}</select></div>
       </div>
       <div class="field2">
-        <div class="field"><label>Sector</label><select id="f_sector">${SECTORES.map(s=>`<option ${o.Sector===s?"selected":""}>${s}</option>`).join("")}</select></div>
         <div class="field"><label>Monto estimado (MXN)</label><input id="f_monto" type="number" inputmode="numeric" value="${o.Monto||""}" placeholder="0"></div>
+        <div class="field"><label>Periodicidad</label><select id="f_period">${PERIODICIDADES.map(p=>`<option ${(o.Periodicidad||"Único")===p?"selected":""}>${p}</option>`).join("")}</select></div>
+      </div>
+      <div class="field2">
+        <div class="field"><label>Sector</label><select id="f_sector">${SECTORES.map(s=>`<option ${o.Sector===s?"selected":""}>${s}</option>`).join("")}</select></div>
+        <div class="field"><label>Vendedor</label><select id="f_vend">${vendorList().map(v=>`<option ${(o.Vendedor||ME)===v?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
       </div>
       <div class="field2">
         <div class="field"><label>Contacto</label><input id="f_cont" list="dl_cont" autocomplete="off" value="${esc(o.Contacto||"")}" placeholder="Nombre" oninput="onContInput()"><datalist id="dl_cont"></datalist></div>
@@ -550,7 +561,6 @@ function openForm(edit){
         <div class="field"><label>Teléfono</label><input id="f_tel" type="tel" value="${esc(o.Telefono||"")}" placeholder="844…"></div>
         <div class="field"><label>Email</label><input id="f_email" type="email" value="${esc(o.Email||"")}" placeholder="@"></div>
       </div>
-      <div class="field"><label>Vendedor</label><select id="f_vend">${vendorList().map(v=>`<option ${(o.Vendedor||ME)===v?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
       <div class="field2">
         <div class="field"><label>Próxima acción</label><input id="f_next" value="${esc(o.ProximaAccion||"")}" placeholder="Llamar, enviar cotización…"></div>
         <div class="field"><label>Fecha</label><input id="f_nextd" type="date" value="${(o.FechaProximaAccion||"").slice(0,10)}"></div>
@@ -603,7 +613,7 @@ async function saveForm(id){
   if(!emp){ toast("Falta la empresa",true); return; }
   const rec={
     Empresa:emp, Descripcion:$("#f_desc").value.trim(), Tipo:$("#f_tipo").value, Etapa:$("#f_etapa").value,
-    Sector:$("#f_sector").value, Monto:$("#f_monto").value, Contacto:$("#f_cont").value.trim(),
+    Sector:$("#f_sector").value, Monto:$("#f_monto").value, Periodicidad:$("#f_period").value, Contacto:$("#f_cont").value.trim(),
     Puesto:$("#f_puesto").value.trim(), Telefono:$("#f_tel").value.trim(), Email:$("#f_email").value.trim(),
     Vendedor:$("#f_vend").value, ProximaAccion:$("#f_next").value.trim(), FechaProximaAccion:$("#f_nextd").value
   };
@@ -638,7 +648,7 @@ function openDetail(id){
       <div class="meta" style="margin:11px 0 14px">
         <span class="tag s-${sk}">${esc(o.Etapa)}</span>
         <span class="tag t-${TIPO_KEY[o.Tipo]||'nuevo'}">${esc(o.Tipo)}</span>
-        ${o.Monto?`<span class="tag" style="background:#23272f;color:#fff">${money(o.Monto)}</span>`:""}
+        ${o.Monto?`<span class="tag" style="background:#23272f;color:#fff">${montoLabel(o)}</span>`:""}
       </div>
 
       ${showHint?`<div class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16v-4M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
