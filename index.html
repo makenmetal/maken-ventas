@@ -41,7 +41,7 @@ header{position:sticky;top:0;z-index:40;background:var(--steel);color:#fff;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .logo b{font-family:'Archivo';font-weight:800;font-size:17px;letter-spacing:.3px}
 .logo span{font-size:11px;color:#9aa1ad;letter-spacing:2px;text-transform:uppercase;display:block;margin-top:-2px}
-.who{display:flex;align-items:center;gap:8px;background:var(--steel2);padding:6px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.who{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.20);color:#fff;padding:7px 12px;border-radius:999px;font-size:13px;font-weight:600}
 .who .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
 .who:active{background:#3a4150}
 
@@ -71,10 +71,10 @@ nav button.active .navbadge{background:var(--amber)}
 .opp .desc{font-size:13px;color:var(--ink2);margin-top:2px}
 .opp .meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;align-items:center}
 .tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;letter-spacing:.2px;white-space:nowrap}
-.opp .next{margin-top:9px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:var(--ink2);background:var(--gray-soft);padding:6px 9px;border-radius:9px}
-.opp .next.due{background:var(--red-soft);color:var(--red)}
-.opp .next.soon{background:var(--amber-soft);color:var(--amber)}
-.opp .next svg{width:14px;height:14px;flex-shrink:0}
+.next{margin-top:9px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:var(--ink2);background:var(--gray-soft);padding:8px 10px;border-radius:9px;line-height:1.35}
+.next.due{background:var(--red-soft);color:var(--red)}
+.next.soon{background:var(--amber-soft);color:var(--amber)}
+.next svg{width:15px;height:15px;flex-shrink:0}
 .monto{font-family:'Archivo';font-weight:700;font-size:14px;color:var(--ink)}
 
 /* stage colors */
@@ -260,6 +260,7 @@ const ADMIN_PIN = "9473";
 
 const STAGES = ["Prospecto","RFQ / Cotizando","Cotización enviada","Seguimiento","Ganado","Perdido"];
 const STAGE_KEY = {"Prospecto":"prospecto","RFQ / Cotizando":"rfq","Cotización enviada":"enviada","Seguimiento":"seguimiento","Ganado":"ganado","Perdido":"perdido"};
+const STAGE_COLOR = {"Prospecto":"#6b7280","RFQ / Cotizando":"#1f6feb","Cotización enviada":"#e8590c","Seguimiento":"#6f42c1","Ganado":"#1a7f37","Perdido":"#cf222e"};
 const OPEN_STAGES = ["Prospecto","RFQ / Cotizando","Cotización enviada","Seguimiento"];
 const TIPOS = ["Prospecto nuevo","Reactivar","Cliente actual"];
 const TIPO_KEY = {"Prospecto nuevo":"nuevo","Reactivar":"reactivar","Cliente actual":"cliente"};
@@ -645,7 +646,7 @@ function openDetail(id){
 
       <div class="d-block">
         <div class="blocktitle">Mover etapa</div>
-        <div class="stages">${STAGES.map(s=>{const k=STAGE_KEY[s];const on=o.Etapa===s;return `<button class="stbtn ${on?'on b-'+k:''}" onclick="moveStage('${id}','${s}')">${on?'✓ ':''}${s}</button>`}).join("")}</div>
+        <div class="stages">${STAGES.map(s=>{const on=o.Etapa===s;return `<button class="stbtn ${on?'on':''}" ${on?`style="background:${STAGE_COLOR[s]};color:#fff;border-color:${STAGE_COLOR[s]}"`:''} onclick="moveStage('${id}','${s}')">${on?'✓ ':''}${s}</button>`}).join("")}</div>
       </div>
 
       <div class="d-block">
