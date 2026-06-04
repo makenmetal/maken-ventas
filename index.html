@@ -384,14 +384,27 @@ function renderClientes(){
     <div id="clist"></div>`;
   $("#view").innerHTML=h;renderClientesList();
 }
+function cuentaBucket(c){
+  if(c.FechaProximaAccion||c.ProximaAccion) return "accion";
+  if(oppsOf(c.ID).some(o=>OPEN_STAGES.includes(o.Etapa))) return "oportunidad";
+  return "nada";
+}
 function renderClientesList(){
   let list=CUENTAS.slice();
   if(FC.mine)list=list.filter(c=>c.Vendedor===ME);
   if(FC.tipo)list=list.filter(c=>c.Tipo===FC.tipo);
   if(FC.estado)list=list.filter(c=>c.Estado===FC.estado);
   if(FC.q){const q=FC.q.toLowerCase();list=list.filter(c=>(c.Empresa+" "+(c.Sector||"")+" "+contactsOf(c).map(x=>x.n).join(" ")).toLowerCase().includes(q));}
-  list.sort((a,b)=>(a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999"));
-  $("#clist").innerHTML=list.length?list.map(c=>cuentaCard(c,false)).join(""):`<div class="empty"><b>Sin clientes</b><div>Agrega tu primer cliente o prospecto.</div><button class="btn btn-primary btn-sm" style="margin:14px auto 0" onclick="openCuentaForm()">+ Nuevo cliente</button></div>`;
+  if(!list.length){$("#clist").innerHTML=`<div class="empty"><b>Sin clientes</b><div>Agrega tu primer cliente o prospecto.</div><button class="btn btn-primary btn-sm" style="margin:14px auto 0" onclick="openCuentaForm()">+ Nuevo cliente</button></div>`;return;}
+  const g={accion:[],nada:[],oportunidad:[]};
+  list.forEach(c=>g[cuentaBucket(c)].push(c));
+  g.accion.sort((a,b)=>(a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999"));
+  g.nada.sort((a,b)=>String(a.Empresa).localeCompare(String(b.Empresa)));
+  g.oportunidad.sort((a,b)=>String(a.Empresa).localeCompare(String(b.Empresa)));
+  const sec=(title,arr,color)=>arr.length?`<div class="sect"><h2 ${color?`style="color:${color}"`:""}>${title}</h2><span class="count">${arr.length}</span></div>`+arr.map(c=>cuentaCard(c,false)).join(""):"";
+  $("#clist").innerHTML = sec("Con próxima acción",g.accion)
+    + sec("Sin actividad",g.nada,"#9a6700")
+    + sec("Con oportunidad activa",g.oportunidad,"var(--green)");
 }
 function setFC(type,val){if(type==="reset"){FC.tipo="";FC.estado="";FC.mine=false;}else if(type==="mine")FC.mine=!FC.mine;else if(type==="tipo")FC.tipo=FC.tipo===val?"":val;else if(type==="estado")FC.estado=FC.estado===val?"":val;renderClientes();}
 
