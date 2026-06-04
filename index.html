@@ -361,10 +361,11 @@ function cuentaCard(c,kind){
 }
 
 /* ===== HOY ===== */
+function tieneAccion(x){ return !!(x && String(x.ProximaAccion||"").trim()); }
 function pendingItems(){
   const items=[];
-  CUENTAS.forEach(c=>{ if(c.ProximaAccion||c.FechaProximaAccion) items.push({kind:"cuenta",id:c.ID,ProximaAccion:c.ProximaAccion,FechaProximaAccion:c.FechaProximaAccion}); });
-  openOpps().forEach(o=>{ if(o.ProximaAccion||o.FechaProximaAccion) items.push({kind:"opp",id:o.ID,ProximaAccion:o.ProximaAccion,FechaProximaAccion:o.FechaProximaAccion}); });
+  CUENTAS.forEach(c=>{ if(tieneAccion(c)) items.push({kind:"cuenta",id:c.ID,ProximaAccion:c.ProximaAccion,FechaProximaAccion:c.FechaProximaAccion}); });
+  openOpps().forEach(o=>{ if(tieneAccion(o)) items.push({kind:"opp",id:o.ID,ProximaAccion:o.ProximaAccion,FechaProximaAccion:o.FechaProximaAccion}); });
   return items;
 }
 function renderHoy(){
@@ -398,7 +399,7 @@ function renderClientes(){
   $("#view").innerHTML=h;renderClientesList();
 }
 function cuentaBucket(c){
-  if(c.FechaProximaAccion||c.ProximaAccion) return "accion";
+  if(tieneAccion(c)) return "accion";
   if(oppsOf(c.ID).some(o=>OPEN_STAGES.includes(o.Etapa))) return "oportunidad";
   return "nada";
 }
@@ -443,7 +444,7 @@ function renderPipelineList(){
   const accion=[],sin=[],cerradas=[];
   list.forEach(o=>{
     if(!OPEN_STAGES.includes(o.Etapa)) cerradas.push(o);
-    else if(o.FechaProximaAccion||o.ProximaAccion) accion.push(o);
+    else if(tieneAccion(o)) accion.push(o);
     else sin.push(o);
   });
   accion.sort((a,b)=>(a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999"));
@@ -486,9 +487,9 @@ function renderMetricas(){
       <div class="kpi" style="grid-column:span 2"><div class="v" style="color:var(--green)">${money(ganMonto)}</div><div class="l">Ganado anualizado (histórico)</div></div>
     </div>
     <div class="sect"><h2>Embudo de oportunidades</h2></div>
-    <div class="card" style="padding:14px">${STAGES.map(s=>{const k=STAGE_KEY[s];const w=Math.round(cStage[s]/maxS*100);return `<div class="frow"><div class="fname">${s}</div><div class="fbar"><div class="ffill b-${k}" style="width:${w}%"></div></div><div class="fn">${cStage[s]}</div></div>`}).join("")}</div>
+    <div class="card" style="padding:14px">${STAGES.map(s=>{const k=STAGE_KEY[s];const w=Math.round(cStage[s]/maxS*100);return `<div class="frow" style="cursor:pointer" onclick="goPipeStage('${esc(s)}')"><div class="fname">${s}</div><div class="fbar"><div class="ffill b-${k}" style="width:${w}%"></div></div><div class="fn">${cStage[s]}</div></div>`}).join("")}</div>
     <div class="sect"><h2>Clientes por estado</h2></div>
-    <div class="card" style="padding:14px">${ESTADOS.map(e=>{const w=Math.round(cEst[e]/maxE*100);const col=ESTADO_COLOR[e];return `<div class="frow"><div class="fname">${e}</div><div class="fbar"><div class="ffill" style="width:${w}%;background:${col}"></div></div><div class="fn">${cEst[e]}</div></div>`}).join("")}</div>
+    <div class="card" style="padding:14px">${ESTADOS.map(e=>{const w=Math.round(cEst[e]/maxE*100);const col=ESTADO_COLOR[e];return `<div class="frow" style="cursor:pointer" onclick="goCliEstado('${esc(e)}')"><div class="fname">${e}</div><div class="fbar"><div class="ffill" style="width:${w}%;background:${col}"></div></div><div class="fn">${cEst[e]}</div></div>`}).join("")}</div>
     <p class="muted" style="font-size:11.5px;text-align:center;margin-top:14px">Prospectos nuevos este mes: ${nuevosMes}</p>`;
   $("#view").innerHTML=h;
 }
@@ -663,12 +664,13 @@ function moveStage(id,stage){applyLocal("Oportunidades",id,{Etapa:stage});openOp
 function setCad(days){const i=$("#d_nextd");if(i){i.value=addDays(days);markCad();}}
 function markCad(){const d=$("#d_nextd")?$("#d_nextd").value:"";[["cad0",0],["cad2",2],["cad7",7],["cad14",14]].forEach(function(p){const b=document.getElementById(p[0]);if(b)b.classList.toggle("on",!!d&&d===addDays(p[1]));});}
 function saveFollowup(tab,id){
-  const note=$("#d_nota").value.trim();const act=$("#d_next").value.trim();let date=$("#d_nextd").value;
+  const note=$("#d_nota").value.trim();let act=$("#d_next").value.trim();let date=$("#d_nextd").value;
   if(!note&&!act&&!date){toast("Escribe una nota o define una acción",true);return;}
   const o=arrFor(tab).find(x=>x.ID===id);const rec={};
   if(note){rec.Notas=(o.Notas?o.Notas+"\n":"")+`[${todayStr()} · ${ME}] ${note}`;rec.FechaUltimoContacto=todayStr();}
-  if(act&&!date)date=todayStr();
-  if(act||date){rec.ProximaAccion=act;rec.FechaProximaAccion=date;}
+  if(date&&!act)act="Seguimiento";          // fecha sin texto => etiqueta genérica
+  if(act&&!date)date=todayStr();            // texto sin fecha => hoy
+  if(act){rec.ProximaAccion=act;rec.FechaProximaAccion=date;}
   applyLocal(tab,id,rec);
   if(tab==="Cuentas")openCuenta(id);else openOpp(id);
   render();pushUpdate(tab,id,rec,"Seguimiento guardado ✓");
@@ -696,6 +698,8 @@ function closeModal(){$("#modal").innerHTML="";}
 
 /* ===== NAV ===== */
 function go(v){VIEW=v;syncNav();render();window.scrollTo(0,0);}
+function goPipeStage(s){FP.stage=s;FP.mine=false;FP.q="";if(s==="Ganado"||s==="Perdido"){COLLAPSED["pipe-cerradas"]=false;localStorage.setItem("maken_collapsed",JSON.stringify(COLLAPSED));}go("pipeline");}
+function goCliEstado(e){FC.estado=e;FC.tipo="";FC.mine=false;FC.q="";go("clientes");}
 function syncNav(){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.v===VIEW));}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>go(b.dataset.v));
 $("#whoBtn").onclick=logout;
