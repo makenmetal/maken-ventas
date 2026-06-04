@@ -75,7 +75,7 @@ nav button.active .navbadge{background:var(--amber)}
 .t-nuevo{background:#eaf6ff;color:#0969da} .t-reactivar{background:#fff4e0;color:#9a6700} .t-cliente{background:#e6f4ea;color:var(--green)}
 
 .sect{display:flex;align-items:center;justify-content:space-between;margin:18px 2px 9px}
-.sect h2{font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin:0}
+.sect h2{font-size:13px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin:0;display:flex;align-items:center;gap:6px}
 .sect .count{font-size:12px;font-weight:700;color:var(--ink3)}
 .bigtitle{font-family:'Archivo';font-weight:800;font-size:23px;margin:6px 2px 2px}
 .subtitle{color:var(--ink3);font-size:13.5px;margin:0 2px 12px}
@@ -310,6 +310,23 @@ function setMe(v){ME=v;localStorage.setItem("maken_vendedor",v);const seen=seenN
 function logout(){localStorage.removeItem("maken_vendedor");location.reload();}
 
 /* ===== RENDER ===== */
+let COLLAPSED={};try{COLLAPSED=JSON.parse(localStorage.getItem("maken_collapsed")||"{}");}catch(e){COLLAPSED={};}
+function isCollapsed(key,def){return (key in COLLAPSED)?COLLAPSED[key]:!!def;}
+function toggleSection(key,def){
+  COLLAPSED[key]=!isCollapsed(key,def);
+  localStorage.setItem("maken_collapsed",JSON.stringify(COLLAPSED));
+  const c=document.getElementById("sec-"+key),ch=document.getElementById("chev-"+key);
+  if(c)c.style.display=COLLAPSED[key]?"none":"block";
+  if(ch)ch.style.transform=COLLAPSED[key]?"rotate(-90deg)":"none";
+}
+function sectionBlock(key,title,cardsHtml,n,color,def,extra){
+  if(!n)return "";
+  const col=isCollapsed(key,def);
+  const chev=`<svg id="chev-${key}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" style="width:13px;height:13px;transition:.18s;transform:${col?'rotate(-90deg)':'none'}"><path d="M6 9l6 6 6-6"/></svg>`;
+  return `<div class="sect" style="cursor:pointer" onclick="toggleSection('${key}',${def?'true':'false'})"><h2 ${color?`style="color:${color}"`:""}>${chev}${title}</h2><span class="count">${n}</span></div>
+    <div class="seccontent" id="sec-${key}" style="display:${col?'none':'block'}">${cardsHtml}${extra||""}</div>`;
+}
+
 function render(){
   const due=pendingItems().filter(p=>p.fecha&&p.fecha<=todayStr()).length;
   const nb=$("#navBadge");if(due>0){nb.classList.remove("hidden");nb.textContent=due;}else nb.classList.add("hidden");
@@ -355,17 +372,13 @@ function renderHoy(){
   const cardOf=(it)=> it.kind==="opp"?oppCard(oppById(it.id),true):cuentaCard(cuentaById(it.id),true);
   const pend=pendingItems();
   const due=pend.filter(p=>p.FechaProximaAccion&&p.FechaProximaAccion<=t).sort((a,b)=>(a.FechaProximaAccion||"").localeCompare(b.FechaProximaAccion||""));
-  const soon=pend.filter(p=>p.FechaProximaAccion&&p.FechaProximaAccion>t&&p.FechaProximaAccion<=addDays(3)).sort((a,b)=>(a.FechaProximaAccion||"").localeCompare(b.FechaProximaAccion||""));
-  const sinAcc=[];
-  openOpps().forEach(o=>{if(!o.ProximaAccion||!o.FechaProximaAccion)sinAcc.push({kind:"opp",id:o.ID});});
-  CUENTAS.filter(c=>["En acercamiento","Con interés"].includes(c.Estado)).forEach(c=>{if(!c.ProximaAccion||!c.FechaProximaAccion)sinAcc.push({kind:"cuenta",id:c.ID});});
+  const soon=pend.filter(p=>p.FechaProximaAccion&&p.FechaProximaAccion>t&&p.FechaProximaAccion<=addDays(5)).sort((a,b)=>(a.FechaProximaAccion||"").localeCompare(b.FechaProximaAccion||""));
   let h=`<div class="bigtitle">Hola, ${esc(ME.split(" ")[0])}</div><p class="subtitle">Tu seguimiento de hoy. La clave es no dejar caer ninguna oportunidad.</p>`;
-  if(!due.length&&!soon.length&&!sinAcc.length){
-    h+=`<div class="empty" style="margin-top:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>Todo al día</b><div>Sin pendientes. Buen momento para prospectar.</div><button class="btn btn-primary btn-sm" style="margin:14px auto 0" onclick="openCuentaForm()">+ Nuevo cliente</button></div>`;
+  if(!due.length&&!soon.length){
+    h+=`<div class="empty" style="margin-top:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>Todo al día</b><div>Sin pendientes para hoy ni los próximos días.</div><button class="btn btn-primary btn-sm" style="margin:14px auto 0" onclick="go('clientes')">Ver clientes</button></div>`;
   }else{
     if(due.length){h+=`<div class="sect"><h2 style="color:var(--red)">Pendiente hoy / vencido</h2><span class="count">${due.length}</span></div>`+due.map(cardOf).join("");}
-    if(soon.length){h+=`<div class="sect"><h2>Próximos días</h2><span class="count">${soon.length}</span></div>`+soon.map(cardOf).join("");}
-    if(sinAcc.length){h+=`<div class="sect"><h2 style="color:#9a6700">Sin próxima acción</h2><span class="count">${sinAcc.length}</span></div>`+sinAcc.map(cardOf).join("");}
+    if(soon.length){h+=`<div class="sect"><h2>Próximos días (5)</h2><span class="count">${soon.length}</span></div>`+soon.map(cardOf).join("");}
   }
   $("#view").innerHTML=h;
 }
@@ -401,10 +414,10 @@ function renderClientesList(){
   g.accion.sort((a,b)=>(a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999"));
   g.nada.sort((a,b)=>String(a.Empresa).localeCompare(String(b.Empresa)));
   g.oportunidad.sort((a,b)=>String(a.Empresa).localeCompare(String(b.Empresa)));
-  const sec=(title,arr,color)=>arr.length?`<div class="sect"><h2 ${color?`style="color:${color}"`:""}>${title}</h2><span class="count">${arr.length}</span></div>`+arr.map(c=>cuentaCard(c,false)).join(""):"";
-  $("#clist").innerHTML = sec("Con próxima acción",g.accion)
-    + sec("Sin actividad",g.nada,"#9a6700")
-    + sec("Con oportunidad activa",g.oportunidad,"var(--green)");
+  const sec=(key,title,arr,color)=>sectionBlock(key,title,arr.map(c=>cuentaCard(c,false)).join(""),arr.length,color,false);
+  $("#clist").innerHTML = sec("cli-accion","Con próxima acción",g.accion)
+    + sec("cli-nada","Sin actividad",g.nada,"#9a6700")
+    + sec("cli-opp","Con oportunidad activa",g.oportunidad,"var(--green)");
 }
 function setFC(type,val){if(type==="reset"){FC.tipo="";FC.estado="";FC.mine=false;}else if(type==="mine")FC.mine=!FC.mine;else if(type==="tipo")FC.tipo=FC.tipo===val?"":val;else if(type==="estado")FC.estado=FC.estado===val?"":val;renderClientes();}
 
@@ -426,8 +439,22 @@ function renderPipelineList(){
   if(FP.mine)list=list.filter(o=>o.Vendedor===ME);
   if(FP.stage)list=list.filter(o=>o.Etapa===FP.stage);
   if(FP.q){const q=FP.q.toLowerCase();list=list.filter(o=>(o.Empresa+" "+(o.Descripcion||"")+" "+(o.Contacto||"")).toLowerCase().includes(q));}
-  list.sort((a,b)=>{const ao=OPEN_STAGES.includes(a.Etapa)?0:1,bo=OPEN_STAGES.includes(b.Etapa)?0:1;if(ao!==bo)return ao-bo;return (a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999");});
-  $("#plist").innerHTML=list.length?list.map(o=>oppCard(o,false)).join(""):`<div class="empty"><b>Sin oportunidades</b><div>Las oportunidades se crean dentro de cada cliente.</div></div>`;
+  if(!list.length){$("#plist").innerHTML=`<div class="empty"><b>Sin oportunidades</b><div>Las oportunidades se crean dentro de cada cliente.</div></div>`;return;}
+  const accion=[],sin=[],cerradas=[];
+  list.forEach(o=>{
+    if(!OPEN_STAGES.includes(o.Etapa)) cerradas.push(o);
+    else if(o.FechaProximaAccion||o.ProximaAccion) accion.push(o);
+    else sin.push(o);
+  });
+  accion.sort((a,b)=>(a.FechaProximaAccion||"9999").localeCompare(b.FechaProximaAccion||"9999"));
+  sin.sort((a,b)=>String(a.Empresa).localeCompare(String(b.Empresa)));
+  cerradas.sort((a,b)=>String(b.FechaActualizado||"").localeCompare(String(a.FechaActualizado||"")));
+  const CERR_LIMIT=20;
+  const cerrShown=cerradas.slice(0,CERR_LIMIT);
+  const extra=cerradas.length>CERR_LIMIT?`<p class="muted" style="font-size:12px;text-align:center;padding:2px 0 8px">…y ${cerradas.length-CERR_LIMIT} más. Filtra por etapa (Ganado/Perdido) para verlas.</p>`:"";
+  $("#plist").innerHTML = sectionBlock("pipe-accion","Con próxima acción",accion.map(o=>oppCard(o,false)).join(""),accion.length,null,false)
+    + sectionBlock("pipe-sin","Sin actividad",sin.map(o=>oppCard(o,false)).join(""),sin.length,"#9a6700",false)
+    + sectionBlock("pipe-cerradas","Cerradas",cerrShown.map(o=>oppCard(o,false)).join(""),cerradas.length,"var(--ink3)",true,extra);
 }
 function setFP(type,val){if(type==="reset"){FP.stage="";FP.mine=false;}else if(type==="mine")FP.mine=!FP.mine;else if(type==="stage")FP.stage=FP.stage===val?"":val;renderPipeline();}
 
