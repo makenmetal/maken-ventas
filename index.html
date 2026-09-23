@@ -247,6 +247,7 @@ const TIPO_KEY = {"Prospecto nuevo":"nuevo","Reactivar":"reactivar","Cliente act
 const ESTADOS = ["Sin contactar","En acercamiento","Con interés","Cliente activo","Dormido"];
 const ESTADO_COLOR = {"Sin contactar":"#6b7280","En acercamiento":"#1f6feb","Con interés":"#6f42c1","Cliente activo":"#1a7f37","Dormido":"#9a6700"};
 const SECTORES = ["Maquinaria pesada","Vehículo comercial","Construcción","Industrial","Alimentos","Energía / HVAC","Otro"];
+const ORIGENES = ["Campaña de correo","Entrada por la página","Referido","Contacto en planta","Feria o evento","Otro"];
 const STAGES = ["RFQ / Cotizando","Cotización enviada","Ganado","Perdido"];
 const STAGE_KEY = {"RFQ / Cotizando":"rfq","Cotización enviada":"enviada","Ganado":"ganado","Perdido":"perdido"};
 const STAGE_COLOR = {"RFQ / Cotizando":"#1f6feb","Cotización enviada":"#e8590c","Ganado":"#1a7f37","Perdido":"#cf222e"};
@@ -268,6 +269,10 @@ const todayStr=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMo
 const money=n=>{n=parseFloat(n)||0;return "$"+n.toLocaleString("es-MX");};
 function addDays(n){const d=new Date();d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function fmtDate(s){if(!s)return"";const p=String(s).slice(0,10).split("-");if(p.length<3)return s;const m=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];return parseInt(p[2])+" "+m[parseInt(p[1])-1];}
+const DIAS_SILENCIO=30;
+function diasSin(c){const ref=c.FechaUltimoContacto||c.FechaCreado;if(!ref)return 9999;const d=(new Date(todayStr())-new Date(String(ref).slice(0,10)))/86400000;return Math.floor(d);}
+/* Cuentas sin proxima accion y sin contacto reciente: no salen en ningun lado, y son las que se pierden. */
+function calladas(){return CUENTAS.filter(c=>!tieneAccion(c)&&c.Estado!=="Dormido"&&diasSin(c)>=DIAS_SILENCIO).sort((a,b)=>diasSin(b)-diasSin(a));}
 function dueState(s){if(!s)return"";const t=todayStr();if(s<=t)return"due";if(s<=addDays(3))return"soon";return"";}
 function toast(msg,err){const t=$("#toast");t.textContent=msg;t.className="show"+(err?" err":"");clearTimeout(t._t);t._t=setTimeout(()=>t.className="",2600);}
 function montoLabel(o){if(!o.Monto)return"";return money(o.Monto)+(o.Periodicidad&&PERIOD_SHORT[o.Periodicidad]?" "+PERIOD_SHORT[o.Periodicidad]:"");}
@@ -356,7 +361,7 @@ function cuentaCard(c,kind){
   const tk=TIPO_KEY[c.Tipo]||"nuevo";const col=ESTADO_COLOR[c.Estado]||"#6b7280";const nopps=oppsOf(c.ID).length;
   return `<div class="card opp" onclick="openCuenta('${c.ID}')">
     <div class="top"><div><div class="emp">${esc(c.Empresa)}</div><div class="desc">${esc(c.Sector||"")}${nopps?` · ${nopps} oportunidad${nopps>1?"es":""}`:""}</div></div></div>
-    <div class="meta">${kind?`<span class="kind k-cta">Cliente</span>`:""}<span class="tag" style="background:${col}22;color:${col}">${esc(c.Estado||"—")}</span><span class="tag t-${tk}">${esc(c.Tipo)}</span>${c.Vendedor?`<span class="tag" style="background:#eef0f3;color:#6b7280">${esc(c.Vendedor)}</span>`:""}</div>
+    <div class="meta">${kind?`<span class="kind k-cta">Cliente</span>`:""}<span class="tag" style="background:${col}22;color:${col}">${esc(c.Estado||"—")}</span><span class="tag t-${tk}">${esc(c.Tipo)}</span>${c.Vendedor?`<span class="tag" style="background:#eef0f3;color:#6b7280">${esc(c.Vendedor)}</span>`:""}${c.Origen?`<span class="tag" style="background:#eef0f3;color:#6b7280">${esc(c.Origen)}</span>`:""}</div>
     ${nextLine(c)}</div>`;
 }
 
@@ -374,12 +379,14 @@ function renderHoy(){
   const pend=pendingItems();
   const due=pend.filter(p=>p.FechaProximaAccion&&p.FechaProximaAccion<=t).sort((a,b)=>(a.FechaProximaAccion||"").localeCompare(b.FechaProximaAccion||""));
   const soon=pend.filter(p=>p.FechaProximaAccion&&p.FechaProximaAccion>t&&p.FechaProximaAccion<=addDays(5)).sort((a,b)=>(a.FechaProximaAccion||"").localeCompare(b.FechaProximaAccion||""));
+  const mudas=calladas();
   let h=`<div class="bigtitle">Hola, ${esc(ME.split(" ")[0])}</div><p class="subtitle">Tu seguimiento de hoy. La clave es no dejar caer ninguna oportunidad.</p>`;
-  if(!due.length&&!soon.length){
+  if(!due.length&&!soon.length&&!mudas.length){
     h+=`<div class="empty" style="margin-top:26px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg><b>Todo al día</b><div>Sin pendientes para hoy ni los próximos días.</div><button class="btn btn-primary btn-sm" style="margin:14px auto 0" onclick="go('clientes')">Ver clientes</button></div>`;
   }else{
     if(due.length){h+=`<div class="sect"><h2 style="color:var(--red)">Pendiente hoy / vencido</h2><span class="count">${due.length}</span></div>`+due.map(cardOf).join("");}
     if(soon.length){h+=`<div class="sect"><h2>Próximos días (5)</h2><span class="count">${soon.length}</span></div>`+soon.map(cardOf).join("");}
+    if(mudas.length){h+=`<div class="sect"><h2 style="color:#9a6700">Sin actividad (${DIAS_SILENCIO}+ días)</h2><span class="count">${mudas.length}</span></div>`+mudas.map(c=>`<div style="position:relative">${cuentaCard(c,true)}<span class="tag" style="position:absolute;right:14px;bottom:13px;background:#fdf6e3;color:#9a6700">${diasSin(c)} días</span></div>`).join("");}
   }
   $("#view").innerHTML=h;
 }
@@ -478,6 +485,7 @@ function renderMetricas(){
   let h=`<div class="bigtitle">Métricas</div><p class="subtitle">Lo que importa para mover ventas esta semana.</p>
     <div class="kpis">
       <div class="kpi amber"><div class="v">${open.length}</div><div class="l">Oportunidades abiertas</div></div>
+      <div class="kpi"><div class="v" style="color:#9a6700">${calladas().length}</div><div class="l">Sin actividad ${DIAS_SILENCIO}+ días</div></div>
       <div class="kpi ${vencidas?'red':''}"><div class="v">${vencidas}</div><div class="l">Pendientes vencidos</div></div>
       <div class="kpi green"><div class="v">${tasa}%</div><div class="l">Tasa de cierre</div></div>
       <div class="kpi blue"><div class="v">${acerc}</div><div class="l">Clientes en acercamiento</div></div>
@@ -510,6 +518,7 @@ function openCuentaForm(edit){
         <div class="field"><label>Sector</label><select id="c_sector">${SECTORES.map(s=>`<option ${c.Sector===s?"selected":""}>${s}</option>`).join("")}</select></div>
         <div class="field"><label>Vendedor</label><select id="c_vend">${vendorList().map(v=>`<option ${(c.Vendedor||ME)===v?"selected":""}>${esc(v)}</option>`).join("")}</select></div>
       </div>
+      <div class="field"><label>Origen</label><select id="c_origen"><option value=""></option>${ORIGENES.map(o=>`<option ${(c.Origen||"")===o?"selected":""}>${o}</option>`).join("")}</select></div>
       <div class="field"><label>Contactos</label><div id="cfwrap"></div>
         <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:2px" onclick="addContactRow()">+ Agregar contacto</button></div>
       ${!isEdit?`<div class="field"><label>Nota inicial (opcional)</label><textarea id="c_nota" placeholder="Contexto del primer acercamiento…"></textarea></div>`:""}
@@ -532,7 +541,7 @@ function rmContactRow(i){FORM_CONTACTS.splice(i,1);renderContactRows();}
 async function saveCuenta(id){
   const emp=$("#c_emp").value.trim();if(!emp){toast("Falta la empresa",true);return;}
   const contactos=FORM_CONTACTS.filter(c=>(c.n||c.t||c.e||c.p));
-  const rec={Empresa:emp,Tipo:$("#c_tipo").value,Estado:$("#c_estado").value,Sector:$("#c_sector").value,Vendedor:$("#c_vend").value,Contactos:JSON.stringify(contactos)};
+  const rec={Empresa:emp,Tipo:$("#c_tipo").value,Estado:$("#c_estado").value,Sector:$("#c_sector").value,Vendedor:$("#c_vend").value,Origen:($("#c_origen")?$("#c_origen").value:""),Contactos:JSON.stringify(contactos)};
   const btn=event.target;btn.textContent="Guardando…";btn.disabled=true;
   try{
     if(id){await apiPost({action:"update",tab:"Cuentas",id,rec});toast("Cambios guardados");}

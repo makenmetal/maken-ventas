@@ -1,0 +1,3 @@
+*.json
+check.js
+__pycache__/
